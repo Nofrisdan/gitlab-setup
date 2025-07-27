@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  gitlab:
+    # Menggunakan image GitLab Community Edition terbaru
+    image: 'gitlab/gitlab-ce:latest'
+    # Nama kontainer
+    container_name: gitlab
+    # Mode detached (berjalan di latar belakang) dan restart otomatis
+    restart: always
+    # Variabel lingkungan untuk konfigurasi GitLab
+    environment:
+      # URL eksternal untuk GitLab (penting agar GitLab menghasilkan URL yang benar)
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://localhost:8001'
+        gitlab_rails['gitlab_shell_ssh_port'] = 2222
+        nginx['listen_port'] = 80
+        nginx['listen_https'] = false
+        nginx['proxy_set_headers'] = {
+          "X-Forwarded-Proto" => "http",
+          "X-Forwarded-Ssl" => "off"
+        }
+    # Pemetaan port dari host ke kontainer
+    ports:
+      - '8001:80'    # Akses HTTP GitLab (dari host:8001 ke kontainer:80)
+      - '8443:443'   # Akses HTTPS GitLab (jika dikonfigurasi)
+      - '2222:22'    # Akses SSH Git (dari host:2222 ke kontainer:22)
+    # Pemetaan volume untuk data persisten
+    volumes:
+      - '/home/nofrisdan/Documents/BELAJAR/DOCKER/setup-gitlab/config:/etc/gitlab'  # Konfigurasi GitLab
+      - '/home/nofrisdan/Documents/BELAJAR/DOCKER/setup-gitlab/logs:/var/log/gitlab'    # Log GitLab
+      - '/home/nofrisdan/Documents/BELAJAR/DOCKER/setup-gitlab/data:/var/opt/gitlab'    # Data GitLab (repositori, database, dll.)
+    # Memastikan GitLab dan GitLab Runner berada di jaringan yang sama
+    networks:
+      - gitlab-network
+
+  gitlab-runner:
+    # Menggunakan image GitLab Runner terbaru
+    image: 'gitlab/gitlab-runner:latest'
+    # Nama kontainer
+    container_name: gitlab-runner
+    # Mode detached dan restart otomatis
+    restart: always
+    # Pemetaan volume untuk konfigurasi runner dan cache
+    volumes:
+      - '/home/nofrisdan/Documents/BELAJAR/DOCKER/setup-gitlab-runner/config:/etc/gitlab-runner' # Konfigurasi Runner
+      - '/var/run/docker.sock:/var/run/docker.sock'   # Penting untuk menjalankan Docker in Docker (dind)
+    # Memastikan Runner terhubung ke jaringan GitLab
+    networks:
+      - gitlab-network
+
+# Definisi jaringan kustom
+networks:
+  gitlab-network:
+    # Menggunakan driver bridge default
+    driver: bridge
